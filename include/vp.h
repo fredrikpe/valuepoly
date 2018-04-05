@@ -1,70 +1,64 @@
+#pragma once
 
 #include <memory>
-#include <vector>
-#include <string>
-#include <iostream>
+#include <type_traits>
 
-template <typename ReturnValue, typename... Args>
-class naive_function {};
 
-template <typename ReturnValue, typename... Args>
-class naive_function<ReturnValue(Args...)> {
-public:
-	template <typename T>
-	naive_function& operator=(T t) {
-		callable_ = std::unique_ptr<CallableT<T>>(new CallableT<T>(t));
-		return *this;
-	}
+namespace tmp {
 
-	ReturnValue operator()(Args... args) const {
-		assert(callable_);
-		return callable_->Invoke(args...);
-	}
-
-private:
-  class ICallable {
-  public:
-    virtual ~ICallable() = default;
-    virtual ReturnValue Invoke(Args...) = 0;
-  };
-  template <typename T>
-  class CallableT : public ICallable {
-  public:
-    CallableT(const T& t)
-      : t_(t) {
-    }
-
-    ~CallableT() override = default;
-
-    ReturnValue Invoke(Args... args) override {
-      return t_(args...);
-    }
-
-  private:
-    T t_;
-  };
-
-	std::unique_ptr<ICallable> callable_;
+template<typename, typename T>
+struct has_signature
+{
+	static_assert(std::integral_constant<T, false>::value,
+                "Second template parameter needs to be of function type.");
 };
 
-class object_t
+template<typename C, typename Ret, typename... Args>
+struct has_signature<C, Ret(Args...)>
+{
+private:
+	template<typename T>
+	static constexpr auto check(T*)
+	-> typename
+		std::is_same<
+			decltype( std::declval<T>().f( std::declval<Args>()... ) ),
+			Ret
+		>::type;
+
+	template<typename>
+	static constexpr std::false_type check(...);
+
+	using type = decltype(check<C>(0));
+
+public:
+	static constexpr bool value = type::value;
+	static constexpr bool nvalue = !type::value;
+};
+
+
+template <typename ...Args>
+class poly {};
+
+template <typename Ret, typename ...Arg>
+class poly<Ret(Arg...)>
 {
 public:
-  template <typename T>
-  object_t(T t)
-    : m(std::make_shared<model<T>>(std::move(t)))
+  template <typename T, typename =
+    typename std::enable_if<has_signature<T, Ret(Arg...)>::value, T>::type>
+  poly(T t)
+    : _model(std::make_shared<model<T>>(std::move(t)))
   {}
 
-  void behaviour() const
+  Ret f(Arg... arg)
   {
-    m->behaviour();
+    return _model->f(arg...);
   }
 
 private:
   struct concept
   {
     virtual ~concept() = default;
-    virtual void behaviour() const = 0;
+    virtual Ret f(Arg... arg) const = 0;
   };
 
   template <typename T>
@@ -73,17 +67,15 @@ private:
     model(T t) : data(std::move(t))
     {}
 
-    void behaviour() const override
+    Ret f(Arg... arg) const
     {
-      std::cout << data;
+      return data.f(arg...);
     }
 
     T data;
   };
 
-  std::shared_ptr<const concept> m;
+  std::shared_ptr<const concept> _model;
 };
 
-
-
-
+} // tmp
