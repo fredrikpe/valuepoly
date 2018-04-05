@@ -4,7 +4,7 @@
 #include <string>
 #include <iostream>
 
-class BottomLayer
+class BaseLayer
 {
 public:
   template <typename AllLayers>
@@ -16,10 +16,10 @@ public:
     {}
 
   public:
-    using Top = typename AllLayers::template Impl<AllLayers>;
+    using MostDerived = typename AllLayers::template Impl<AllLayers>;
 
-    Top&       top()       { return static_cast<Top&>(*this); }
-    const Top& top() const { return static_cast<const Top&>(*this); }
+    MostDerived&       most_derived()       { return static_cast<MostDerived&>(*this); }
+    const MostDerived& most_derived() const { return static_cast<const MostDerived&>(*this); }
   };
 };
 
@@ -30,21 +30,21 @@ public:
   template <typename AllLayers>
   class Impl : public UpperLayer::template Impl<AllLayers>
   {
-    using Super = typename UpperLayer::template Impl<AllLayers>;
+    using Parent = typename UpperLayer::template Impl<AllLayers>;
 
   public:
     template <typename ...Args>
     explicit Impl(std::string s, int i, Args... args)
-      : Super(args...),
+      : Parent(args...),
       s(s),
-      iLayerAData(i)
+      layerA_int(i)
     { }
 
   public:
     void foo()
     {
       std::cout << __PRETTY_FUNCTION__ << std::endl;
-      this->top().bar();
+      this->most_derived().bar();
     }
 
     void bar()
@@ -53,7 +53,7 @@ public:
     }
 
     std::string s;
-    int iLayerAData;
+    int layerA_int;
   };
 };
 
@@ -64,22 +64,22 @@ public:
   template <typename AllLayers>
   class Impl : public UpperLayer::template Impl<AllLayers>
   {
-    using Super = typename UpperLayer::template Impl<AllLayers>;
+    using Parent = typename UpperLayer::template Impl<AllLayers>;
 
   public:
     template <typename ...Args>
     explicit Impl(int i, Args... args) :
-      Super(args...),
-      iLayerBData(i)
+      Parent(args...),
+      layerB_int(i)
     { }
 
     void bar()
     {
       std::cout << __PRETTY_FUNCTION__ << std::endl;
-      Super::bar();
+      Parent::bar();
     }
 
-    int iLayerBData;
+    int layerB_int;
   };
 };
 
@@ -90,12 +90,12 @@ public:
   template <typename AllLayers>
   class Impl : public UpperLayer::template Impl<AllLayers>
   {
-    using Super = typename UpperLayer::template Impl<AllLayers>;
+    using Parent = typename UpperLayer::template Impl<AllLayers>;
 
   public:
     template <typename ...Args>
     explicit Impl(Args... args)
-      : Super(args...)
+      : Parent(args...)
     { }
   };
 };
@@ -104,22 +104,23 @@ public:
 
 int main()
 {
-  using MyLayerA = LayerA<BottomLayer>;
+  using MyLayerA = LayerA<BaseLayer>;
   using MyLayerAB = LayerB<MyLayerA>;
   using MyLayerABC = LayerC<MyLayerAB>;
+  using AllLayers = MyLayerABC;
 
-  using MySharedA = MyLayerA::Impl<MyLayerABC>;
-  using MySharedAB = MyLayerAB::Impl<MyLayerABC>;
-  using MySharedABC = MyLayerABC::Impl<MyLayerABC>;
+  using ImplA = MyLayerA::Impl<AllLayers>;
+  using MyImplAB = MyLayerAB::Impl<AllLayers>;
+  using MyImplABC = MyLayerABC::Impl<AllLayers>;
 
-  MySharedA sa(std::string("asdf"), 20);
-  MySharedAB sb{10, sa};
-  MySharedABC sc{sb};
+  //MyImplA sa(std::string("asdf"), 20);
+  MyImplAB sb{1, "asdf", 20};
+  MyImplABC sc{sb};
 
-  //MySharedAB s(10, std::string("asdf"), 20);
 
   sc.foo();
-  std::cout << sc.iLayerBData << std::endl;
+  std::cout << sc.layerA_int << std::endl;
+  std::cout << sc.layerB_int << std::endl;
 }
 
 
